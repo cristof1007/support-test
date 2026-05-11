@@ -5,19 +5,24 @@ namespace IncidentManagementSystem.Models;
 public class Category
 {
     public int Id { get; set; }
-    
+
     [Required]
     [StringLength(100)]
     public string Name { get; set; } = string.Empty;
-    
+
     [StringLength(500)]
     public string? Description { get; set; }
-    
+
     // BUG: No hay navegación inversa - causa problemas de lazy loading
-    // public virtual ICollection<Incident> Incidents { get; set; } = new List<Incident>();
-    
+    //CAMBIO: Se habilita relación inversa para permitir navegación bidireccional
+    // y evitar problemas en consultas relacionadas con Incidents
+    public virtual ICollection<Incident> Incidents { get; set; } = new List<Incident>();
+
     // BUG: Falta campo de auditoría
-    // public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
-    
-     public bool IsActive { get; set; } = true;
+    //CAMBIO: Se agrega CreatedDate para control de creación de registros
+    public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
+
+    //CAMBIO: Mejora de control de estado
+    // Permite activar/desactivar categorías sin eliminarlas
+    public bool IsActive { get; set; } = true;
 }
