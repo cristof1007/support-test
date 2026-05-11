@@ -10,15 +10,26 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+
+//CAMBIO: Validación defensiva de connection string
+if (string.IsNullOrWhiteSpace(connectionString))
+{
+    throw new InvalidOperationException("Connection string 'DefaultConnection' is not configured.");
+}
+
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(connectionString));
 
 // BUG: No se registra la interfaz, solo la implementación
-builder.Services.AddScoped<IncidentService>();
+//CAMBIO: Se registra la abstracción para seguir DIP (Dependency Inversion Principle)
+builder.Services.AddScoped<IIncidentService, IncidentService>();
+
+//CAMBIO: DatabaseService registrado correctamente (si depende de DI)
 builder.Services.AddScoped<DatabaseService>();
 
 // BUG: No se agrega logging
-// builder.Services.AddLogging();
+//CAMBIO: Se habilita logging estructurado
+builder.Services.AddLogging();
 
 var app = builder.Build();
 
@@ -30,14 +41,31 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+//CAMBIO: Se agrega middleware de routing (buena práctica moderna)
+app.UseRouting();
+
 app.UseAuthorization();
+
 app.MapControllers();
 
- using (var scope = app.Services.CreateScope())
+//CAMBIO: Corrección de migraciones seguras al iniciar la app
+using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    await context.Database.MigrateAsync();
-    await DbInitializer.Initialize(context);
+
+    //CAMBIO: Manejo de errores en migración para evitar crash en startup
+    try
+    {
+        await context.Database.MigrateAsync();
+        await DbInitializer.Initialize(context);
+    }
+    catch (Exception ex)
+    {
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "Error applying migrations or initializing database.");
+        throw;
+    }
 }
 
 app.Run();
